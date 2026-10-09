@@ -1,0 +1,8 @@
+# The Python packages setup_lite.py installs into .venv, pinned so a checkout installs the same ones on any day.
+# setup_lite.py's pip step reads this file; an install from before it keeps the packages it has.
+jinja2==3.1.6
+regex==2026.9.10
+psutil==7.2.2
+
+# jinja2's dependency
+markupsafe==3.0.3
