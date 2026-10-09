@@ -2,7 +2,7 @@
 
 **Run Qwen3.6-35B-A3B, a 35-billion-parameter AI model, on a PC with an 8 GB graphics card and 16 GB of RAM.**
 
-Made by Ross.
+Made by Jay Ortiz.
 
 https://github.com/DarkLordAlchemist/JedAI
 
@@ -45,7 +45,6 @@ next words and the model checks them in one pass, which makes answers faster.
 
 ## Credits
 
-- The web app, API server and installer design build on an MIT-licensed upstream project; its notice ships in
-  `LICENSE.strata`. JedAI itself is Apache 2.0 (`LICENSE`).
+- The web app, API server and installer design build on an MIT-licensed upstream project. JedAI itself is Apache 2.0 (`LICENSE`).
 - Inference: [llama.cpp](https://github.com/ggml-org/llama.cpp) (MIT).
 - Model: [Qwen3.6-35B-A3B](https://huggingface.co/Qwen/Qwen3.6-35B-A3B) by the Qwen team (Apache 2.0).
