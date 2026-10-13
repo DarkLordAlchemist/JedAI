@@ -30,12 +30,12 @@ def fake_exe(tmp: Path) -> str:
 
 
 class Engine:
-    def __init__(self, llama_server: str, extra=()):
-        env = {**os.environ, "FAKE_LOG": ""}
+    def __init__(self, llama_server: str, extra=(), env_extra=None, engine_args=()):
+        env = {**os.environ, "FAKE_LOG": "", **(env_extra or {})}
         env.pop("FAKE_TOKENIZER", None)
         self.p = subprocess.Popen([sys.executable, str(ENGINE), "--serve", "--llama-server", llama_server,
                                    "--model", "m.gguf", "--max-context", "8192", "--eos-ids", f"{IM_END},151643",
-                                   "--llama-args", "-ngl 999 --cpu-moe --moe-cache-mib 1820", *extra],
+                                   "--llama-args", "-ngl 999 --cpu-moe --moe-cache-mib 1820", *extra, *engine_args],
                                   stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL,
                                   text=True, bufsize=1, env=env)
         self.q: queue.Queue = queue.Queue()
@@ -126,6 +126,65 @@ class TestProtocol(unittest.TestCase):
         self.assertTrue(self.e.until("ERR")[-1].startswith("ERR"))
         self.e.send("SAVE x")
         self.assertTrue(self.e.until("SERR")[-1].startswith("SERR invalid"))
+
+
+class TestPrivateEnginePort(unittest.TestCase):
+    """llama-server's own web page must never be what a user lands on: the app is JedAI's page (Chat, Monitor, About).
+    The page is switched off with whichever flag this llama.cpp build knows, and the private port needs a key only the
+    engine has, so even a build that ignores the flag shows nothing to a browser."""
+
+    def setUp(self):
+        import importlib.util
+        import tempfile
+        self.tmp = Path(tempfile.mkdtemp())
+        spec = importlib.util.spec_from_file_location("llamacpp_engine_under_test", ENGINE)
+        self.mod = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(self.mod)
+        self.exe = fake_exe(self.tmp)
+
+    def _flags(self, help_text):
+        old = os.environ.get("FAKE_HELP")
+        os.environ["FAKE_HELP"] = help_text
+        try:
+            return self.mod.ui_off_args(self.exe)
+        finally:
+            if old is None:
+                os.environ.pop("FAKE_HELP")
+            else:
+                os.environ["FAKE_HELP"] = old
+
+    def test_flag_follows_the_build(self):
+        self.assertEqual(self._flags("--webui, --no-webui\n--ui, --no-ui"), ["--no-ui"])     # newer: prefer the new name
+        self.assertEqual(self._flags("--webui, --no-webui"), ["--no-webui"])                  # older build
+        self.assertEqual(self._flags("--moe-cache-mib N"), [])                                # knows neither
+        self.assertEqual(self.mod.ui_off_args(str(self.tmp / "missing.exe")), ["--no-webui"])  # cannot be asked
+
+    def test_private_port_needs_the_engine_key(self):
+        import json as js
+        import socket
+        import urllib.error
+        import urllib.request
+        with socket.socket() as s:
+            s.bind(("127.0.0.1", 0))
+            port = s.getsockname()[1]
+        argv_file = self.tmp / "argv.json"
+        e = Engine(self.exe, env_extra={"FAKE_ARGS": str(argv_file)}, engine_args=["--llama-port", str(port)])
+        try:
+            e.until("READY")                     # the engine itself got through /health, /props with its key
+            argv = js.loads(argv_file.read_text())
+            self.assertIn("--no-ui", argv)
+            key = argv[argv.index("--api-key") + 1]
+            self.assertGreaterEqual(len(key), 20)
+            url = f"http://127.0.0.1:{port}/props"
+            with self.assertRaises(urllib.error.HTTPError) as cm:     # a browser on the private port: refused
+                urllib.request.urlopen(url, timeout=5)
+            self.assertEqual(cm.exception.code, 401)
+            req = urllib.request.Request(url, headers={"Authorization": f"Bearer {key}"})
+            self.assertEqual(urllib.request.urlopen(req, timeout=5).status, 200)
+            e.send("GEN 2 1,2")                  # generation works with the key too
+            self.assertEqual(e.until("DONE")[-1].split()[5], "length")
+        finally:
+            e.close()
 
 
 class TestStartFailure(unittest.TestCase):

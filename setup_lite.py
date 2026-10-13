@@ -545,10 +545,35 @@ def main() -> int:
     return start(cfg_path, a)
 
 
+UI_FILES = ("index.html", "monitor.html", "monitor.js", "app.js", "app.css", "components.css", "tokens.css", "sprite.svg")
+UI_TABS = ("chat", "monitor", "about")
+
+
+def check_ui(root: Path = ROOT) -> list[str]:
+    """What is missing from the web app (the page with Chat, Monitor and About). Empty when it is all there. Every
+    install runs this before starting, so a half-copied folder never ends up showing some other page."""
+    web = root / "serve" / "web"
+    problems = [f"serve/web/{n}" for n in UI_FILES if not (web / n).is_file()]
+    try:
+        html = (web / "index.html").read_text(encoding="utf-8")
+    except OSError:
+        return problems
+    problems += [f"the {t.capitalize()} tab" for t in UI_TABS if f'data-tab="{t}"' not in html]
+    return problems
+
+
 def start(cfg_path: Path, a) -> int:
     cfg = json.loads(cfg_path.read_text(encoding="utf-8"))
     port = str(cfg.get("port", a.port))
-    say(f"\nStarting {BRAND['name']} on http://{cfg.get('host', '127.0.0.1')}:{port} (close this window to stop) ...")
+    host = cfg.get("host", "127.0.0.1")
+    missing = check_ui()
+    if missing:
+        say(f"\nThe web app is incomplete here (missing: {', '.join(missing)}).")
+        say(f"Download {BRAND['name']} again from GitHub and run START-HERE again; nothing was started.")
+        return 1
+    say(f"\nStarting {BRAND['name']} on http://{host}:{port} (close this window to stop) ...")
+    say(f"Open http://{'127.0.0.1' if host in ('0.0.0.0', '') else host}:{port}/ - the {BRAND['name']} app with Chat, "
+        "Monitor and About. llama.cpp's own page is switched off; its private port is not for browsing.")
     say("The first start reads the model into memory: the PC can be slow for a minute or two.\n")
     cmd = [sys.executable, "-m", "serve.server", "--engine", "jedai", "--config", str(cfg_path), "--port", port,
            "--open"]

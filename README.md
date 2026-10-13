@@ -23,6 +23,11 @@ The first run checks your graphics card and RAM, suggests a model size, download
 resume if interrupted), and opens the app at `http://127.0.0.1:8080`. Later runs start right away.
 `START-HERE.bat --setup` chooses again. Already have the GGUF? `START-HERE.bat --setup --gguf D:\path\model.gguf`.
 
+The page you use is always JedAI's own app at `http://127.0.0.1:8080/` - **Chat, Monitor and About**. llama.cpp's own
+web page is switched off (whichever llama.cpp build is installed), and the port llama.cpp listens on is private and
+locked with a key only JedAI knows, so it is never the page you end up on. Every start also checks that the app's files
+are all there and refuses to start, naming what is missing, if they are not.
+
 ## What you need
 
 | | |

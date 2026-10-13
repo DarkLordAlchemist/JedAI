@@ -16,9 +16,15 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
 args = sys.argv[1:]
 if "--help" in args:
-    print("--moe-cache-mib N   GPU cache size in MiB for the MoE experts kept in the CPU\n--spec-type  [draft-mtp,...]")
+    # FAKE_HELP: what this build's --help lists (e.g. only "--no-webui" for an older llama.cpp, "--no-ui" for a newer one)
+    print(os.environ.get("FAKE_HELP", "--moe-cache-mib N   GPU cache size in MiB for the MoE experts kept in the CPU\n"
+                                      "--spec-type  [draft-mtp,...]\n--webui, --no-webui\n--ui, --no-ui"))
     sys.exit(0)
 opt = lambda k, d=None: args[args.index(k) + 1] if k in args else d
+API_KEY = opt("--api-key")      # like llama-server: everything but /health needs "Authorization: Bearer <key>"
+if os.environ.get("FAKE_ARGS"):             # the command line this server was started with (the test reads it)
+    with open(os.environ["FAKE_ARGS"], "w") as f:
+        f.write(json.dumps(args))
 port, n_ctx = int(opt("--port")), int(opt("-c", "4096"))
 # with FAKE_TOKENIZER (a tokenizer/ folder) the reply is real text; without it, plain ids (enough for protocol tests)
 tok = None
@@ -67,11 +73,16 @@ class H(BaseHTTPRequestHandler):
         self.end_headers()
         self.wfile.write(b)
 
+    def authorized(self):
+        return not API_KEY or self.headers.get("Authorization") == f"Bearer {API_KEY}"
+
     def do_GET(self):
         if self.path == "/health":
             if time.time() - started < 1.5:
                 return self.send_json(503, {"error": {"code": 503, "message": "Loading model"}})
             return self.send_json(200, {"status": "ok"})
+        if not self.authorized():
+            return self.send_json(401, {"error": {"code": 401, "message": "Invalid API Key"}})
         if self.path == "/props":
             return self.send_json(200, {"default_generation_settings": {"n_ctx": n_ctx}, "build_info": "b9301-86a2835"})
         self.send_json(404, {})
@@ -79,6 +90,8 @@ class H(BaseHTTPRequestHandler):
     def do_POST(self):
         global last_prompt
         body = json.loads(self.rfile.read(int(self.headers["Content-Length"])))
+        if not self.authorized():
+            return self.send_json(401, {"error": {"code": 401, "message": "Invalid API Key"}})
         log_request({k: v for k, v in body.items() if k != "prompt"} | {"n_prompt": len(body["prompt"])})
         prompt = body["prompt"]
         cache = 0

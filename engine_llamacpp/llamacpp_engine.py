@@ -35,6 +35,7 @@ import json
 import os
 import queue
 import re
+import secrets
 import shlex
 import signal
 import socket
@@ -115,6 +116,23 @@ def free_port() -> int:
         return s.getsockname()[1]
 
 
+def ui_off_args(llama_server: str) -> list[str]:
+    """llama-server's own web page must never be what a user ends up in front of (the app is JedAI's page on its
+    port: Chat, Monitor, About). The switch that turns that page off was renamed between llama.cpp builds (--no-webui,
+    then --no-ui), so ask this build which one it knows. If it cannot be asked, keep the old one."""
+    try:
+        r = subprocess.run([llama_server, "--help"], stdin=subprocess.DEVNULL, capture_output=True, text=True,
+                           encoding="utf-8", errors="replace", timeout=60)
+        text = (r.stdout or "") + (r.stderr or "")
+    except (OSError, subprocess.SubprocessError):
+        return ["--no-webui"]
+    if "--no-ui" in text:
+        return ["--no-ui"]
+    if "--no-webui" in text:
+        return ["--no-webui"]
+    return []           # neither is known to this build: the private API key below still locks its page
+
+
 class LlamaServer:
     """The private llama-server process: started once, its log copied to our stderr and read for the facts the
     Monitor shows (the MoE cache's slots and size, the layers on the GPU)."""
@@ -126,9 +144,19 @@ class LlamaServer:
     def __init__(self, a: dict):
         self.port = a["port"] or free_port()
         self.facts: dict = {}
+        extra = a["extra"]
+        # a key only this engine knows: a browser pointed at llama-server's private port gets nothing usable, whatever
+        # build of llama.cpp is installed and whichever page it ships
+        if "--api-key" in extra and extra.index("--api-key") + 1 < len(extra):
+            self.key = extra[extra.index("--api-key") + 1]
+            key_args = []
+        else:
+            self.key = secrets.token_urlsafe(24)
+            key_args = ["--api-key", self.key]
         cmd = [a["llama_server"], "-m", a["model"], "--host", "127.0.0.1", "--port", str(self.port),
-               "-c", str(a["max_context"]), "-np", "1", "--no-webui", *a["extra"]]
-        log("starting: " + " ".join(cmd))
+               "-c", str(a["max_context"]), "-np", "1", *ui_off_args(a["llama_server"]), *key_args, *extra]
+        shown = [("<private key>" if i and cmd[i - 1] == "--api-key" else c) for i, c in enumerate(cmd)]
+        log("starting: " + " ".join(shown))
         flags = subprocess.CREATE_NEW_PROCESS_GROUP if os.name == "nt" else 0
         self.proc = subprocess.Popen(cmd, stdin=subprocess.DEVNULL, stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
                                      text=True, encoding="utf-8", errors="replace", bufsize=1, creationflags=flags)
@@ -137,6 +165,8 @@ class LlamaServer:
     def _copy_log(self):
         slots = 0
         for line in self.proc.stdout:
+            if "listening on http://" in line:       # not an address to open: the app is JedAI's own page
+                line = "llama-server is ready on its private engine port (not a web page - open JedAI's address)\n"
             sys.stderr.write(line)
             sys.stderr.flush()
             m = self.CACHE_SIZE.search(line)
@@ -155,7 +185,9 @@ class LlamaServer:
         return self.proc.poll() is None
 
     def get(self, path: str, timeout: float = 5.0):
-        with urllib.request.urlopen(f"http://127.0.0.1:{self.port}{path}", timeout=timeout) as r:
+        req = urllib.request.Request(f"http://127.0.0.1:{self.port}{path}",
+                                     headers={"Authorization": f"Bearer {self.key}"})
+        with urllib.request.urlopen(req, timeout=timeout) as r:
             return json.loads(r.read().decode("utf-8"))
 
     def wait_ready(self) -> dict:
@@ -252,7 +284,8 @@ class Request:
         try:
             self.conn = http.client.HTTPConnection("127.0.0.1", self.srv.port, timeout=None)
             self.conn.request("POST", "/completion", body=json.dumps(self.body),
-                              headers={"Content-Type": "application/json"})
+                              headers={"Content-Type": "application/json",
+                                       "Authorization": f"Bearer {self.srv.key}"})
             resp = self.conn.getresponse()
             if resp.status != 200:
                 detail = resp.read().decode("utf-8", "replace")

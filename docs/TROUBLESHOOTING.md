@@ -15,6 +15,11 @@ Update it (NVIDIA App or [nvidia.com/drivers](https://www.nvidia.com/drivers)), 
 **It says port 8080 is already in use.**
 JedAI is already running - look for its window. Or another program uses the port: `START-HERE.bat --port 8081`.
 
+**I see a different page than Chat / Monitor / About (for example llama.cpp's own chat page).**
+Open exactly `http://127.0.0.1:8080/` - the address the console prints after `Open`. Do not open the other port number
+shown in the log: that is llama.cpp's private port, it needs a key and is not a web page. If `START-HERE.bat` says the
+web app is incomplete, download JedAI again from GitHub (a half-copied folder is missing `serve/web`).
+
 **AMD or Intel card not detected.**
 Setup only sees NVIDIA cards on its own. Tell it about yours: `START-HERE.bat --setup --vram-gb 8`; it then uses
 llama.cpp's Vulkan build.
