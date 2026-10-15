@@ -1,10 +1,11 @@
 #!/usr/bin/env python3
-"""setup_lite.py - install and start the small-PC edition: Qwen3.6-35B-A3B through llama.cpp, behind the same web app,
-API and Monitor as the full engine.
+"""setup_lite.py - install and start the small-PC edition: gpt-oss-20b (default) or Qwen3.6-35B-A3B through llama.cpp,
+behind the same web app, API and Monitor.
 
     START-HERE.bat / ./setup.sh             first run: everything; later runs: start
     ... --setup                              choose again (quant, context, placement)
-    ... --gguf D:\\models\\Qwen3.6-35B-A3B-Q4_K_M.gguf     use a GGUF you already have (no download)
+    ... --gguf D:\\models\\gpt-oss-20b-mxfp4.gguf     use a GGUF you already have (no download)
+    ... --model qwen3.6-35b-a3b              the other model
     ... --llama-server C:\\llama\\llama-server.exe        use a llama.cpp you already have
     ... --quant IQ4_XS --ctx 16384 --mode cache|layers --moe-cache-mib 3000 --yes --no-start
 
@@ -49,7 +50,17 @@ except (OSError, ValueError):
 # The models this edition offers. Any model whose GGUF carries the Qwen3.5-family tokenizer (pre "qwen35") works with
 # the web app as it is; add one here. Repos are tried in order for the size you pick; an MTP repo first, because its
 # file carries the draft layer that makes answers ~1.2-1.3x faster (llama.cpp --spec-type draft-mtp).
+# A model marked "native" is not run through serve/server.py (which tokenizes in the Qwen family's way) but by
+# llama-server itself (`--jinja`: its own chat template and tool calls), with JedAI's page in front: serve/native.py.
 MODELS = {
+    "gpt-oss-20b": {
+        "title": "gpt-oss-20b",
+        "repos": ["ggml-org/gpt-oss-20b-GGUF"],
+        "default_quant": "MXFP4",
+        "license": "Apache-2.0 (OpenAI)",
+        "native": True,
+        "default_ctx": 131072,
+    },
     "qwen3.6-35b-a3b": {
         "title": "Qwen3.6-35B-A3B",
         "repos": ["ggml-org/Qwen3.6-35B-A3B-MTP-GGUF", "unsloth/Qwen3.6-35B-A3B-GGUF",
@@ -58,7 +69,7 @@ MODELS = {
         "license": "Apache-2.0 (Qwen)",
     },
 }
-DEFAULT_MODEL = "qwen3.6-35b-a3b"
+DEFAULT_MODEL = "gpt-oss-20b"
 QUANT_RE = re.compile(r"(?i)(?:^|[-_.])((?:UD-)?(?:IQ\d_[A-Z0-9]+|Q\d_K(?:_[A-Z0-9]+)?|Q\d_\d|MXFP4(?:_MOE)?|BF16|F16|Q8_0))"
                       r"(?=[-_.])")
 SHARD_RE = re.compile(r"-(\d{5})-of-(\d{5})\.gguf$")
@@ -199,14 +210,14 @@ def download(url: str, dest: Path, size: int | None = None) -> Path:
 NEEDED_FLAGS = ("--moe-cache-mib", "draft-mtp")
 
 
-def llama_features(exe: Path) -> set[str]:
+def llama_features(exe: Path, flags: tuple = ()) -> set[str]:
     try:
         out = subprocess.run([str(exe), "--help"], capture_output=True, text=True, timeout=60,
                              encoding="utf-8", errors="replace")
         text = out.stdout + out.stderr
     except (OSError, subprocess.TimeoutExpired):
         return set()
-    return {f for f in NEEDED_FLAGS if f in text}
+    return {f for f in (flags or NEEDED_FLAGS) if f in text}
 
 
 def release_assets(gpu: dict) -> list[list[str]]:
@@ -235,10 +246,10 @@ def pick_release() -> dict:
     raise SystemExit("no llama.cpp release with downloads was found; download one yourself and pass --llama-server")
 
 
-def install_llama(gpu: dict, dest: Path) -> Path:
+def install_llama(gpu: dict, dest: Path, needed: tuple = ()) -> Path:
     exe_name = "llama-server.exe" if WINDOWS else "llama-server"
     found = next(iter(sorted(dest.rglob(exe_name))), None) if dest.exists() else None
-    if found and set(NEEDED_FLAGS) <= llama_features(found):
+    if found and set(needed or NEEDED_FLAGS) <= llama_features(found, needed):
         return found
     say("Downloading llama.cpp (the newest release with builds) ...")
     rel = pick_release()
@@ -476,6 +487,8 @@ def main() -> int:
         gguf = fetch_gguf(model, quant, data / "models", catalog)
 
     facts = gguf_facts(gguf)
+    if model.get("native"):
+        return setup_native(a, model, cfg_path, gguf, facts, gpu, data, ram_total, os_reserve)
     if facts["pre"] != "qwen35":
         raise SystemExit(f"{gguf.name}: tokenizer '{facts['pre']}'. The web app speaks the Qwen3.5-family tokenizer "
                          "(pre 'qwen35') only; pick a Qwen3.5 / Qwen3.6 model.")
@@ -545,6 +558,51 @@ def main() -> int:
     return start(cfg_path, a)
 
 
+def setup_native(a, model: dict, cfg_path: Path, gguf: Path, facts: dict, gpu: dict, data: Path,
+                 ram_total: float, os_reserve: float) -> int:
+    """A native model (gpt-oss-20b): llama-server runs it with its own chat template; serve/native.py puts JedAI's page
+    in front. Placement is by layer: on an 8 GB laptop it measured 2x faster than the VRAM expert cache."""
+    say(f"\n{gguf.name}: {facts['n_layer']} layers, {facts['n_expert']} experts each; experts "
+        f"{facts['expert_bytes'] / GB:.1f} GB, rest {facts['gpu_bytes'] / GB:.2f} GB")
+    needed = ("--n-cpu-moe", "--jinja")
+    exe = Path(a.llama_server).resolve() if a.llama_server else install_llama(gpu, data / "llama.cpp", needed)
+    missing = [f for f in needed if f not in llama_features(exe, needed)]
+    if missing:
+        raise SystemExit(f"this llama.cpp lacks {', '.join(missing)}: delete data-lite/llama.cpp (or pass a newer "
+                         "--llama-server) and run setup again")
+    ctx = a.ctx or int(ask("Context size (tokens)", str(model.get("default_ctx", 32768)), a.yes))
+    p = plan(facts, gpu, ctx, "layers", None, a.vram_reserve_mib)
+    on_gpu = p["gpu_expert_layers"]
+    if p["room_mib"] < 0:
+        say(f"  The GPU part and the KV cache ({p['kv_mib'] / 1024:.2f} GB at {ctx:,} tokens) need more VRAM than is "
+            "free: try a smaller --ctx, or close what uses the GPU.")
+    cpu_side = (facts["expert_bytes"] - on_gpu * facts["layer_expert_bytes"]) / GB
+    say(f"Placement (layers): the experts of {on_gpu} of {facts['n_layer']} layers on the GPU, the rest ({cpu_side:.1f} GB) in RAM")
+    if cpu_side > ram_total - os_reserve:
+        say("  RAM: the experts are more than this PC's RAM leaves free; the operating system pages them from the disk.")
+    rel = lambda x: os.path.relpath(x, ROOT) if str(Path(x).resolve()).startswith(str(ROOT)) else str(x)
+    cfg = {
+        "native": True,
+        "llama_server": rel(exe),
+        "model": rel(gguf),
+        "model_name": a.model,
+        "quant": quant_of(gguf.name),
+        "max_context": ctx,
+        "gpu_expert_layers": on_gpu,
+        "llama_args": ["-ngl", "999", "--n-cpu-moe", str(facts["n_layer"] - on_gpu), "--jinja"],
+        "log": f"{BRAND['slug']}-{a.model}.log",
+        "host": a.host,
+        "port": a.port,
+    }
+    if a.api_key:
+        cfg["api_key"] = a.api_key
+    cfg_path.write_text(json.dumps(cfg, indent=2), encoding="utf-8")
+    say(f"\nWrote {cfg_path.name}. llama-server will run with: {' '.join(cfg['llama_args'])}")
+    if a.no_start:
+        return 0
+    return start(cfg_path, a)
+
+
 UI_FILES = ("index.html", "monitor.html", "monitor.js", "app.js", "app.css", "components.css", "tokens.css", "sprite.svg")
 UI_TABS = ("chat", "monitor", "about")
 
@@ -575,8 +633,11 @@ def start(cfg_path: Path, a) -> int:
     say(f"Open http://{'127.0.0.1' if host in ('0.0.0.0', '') else host}:{port}/ - the {BRAND['name']} app with Chat, "
         "Monitor and About. llama.cpp's own page is switched off; its private port is not for browsing.")
     say("The first start reads the model into memory: the PC can be slow for a minute or two.\n")
-    cmd = [sys.executable, "-m", "serve.server", "--engine", "jedai", "--config", str(cfg_path), "--port", port,
-           "--open"]
+    if cfg.get("native"):
+        cmd = [sys.executable, "-m", "serve.native", "--config", str(cfg_path), "--port", port, "--open"]
+    else:
+        cmd = [sys.executable, "-m", "serve.server", "--engine", "jedai", "--config", str(cfg_path), "--port", port,
+               "--open"]
     return subprocess.call(cmd, cwd=ROOT)
 
 

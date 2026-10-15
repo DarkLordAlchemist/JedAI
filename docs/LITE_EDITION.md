@@ -2,8 +2,9 @@
 
 JedAI gives you everything a user sees (a chat page, the Monitor, the OpenAI and Anthropic APIs, the MCP tools,
 the one-click launchers) and runs it on llama.cpp: **Qwen3.6-35B-A3B** through a small engine adapter, on an 8 GB
-graphics card with 16 GB of RAM. (**gpt-oss-20b**, the recommended model, bypasses this adapter and the server's
-tokenizer - see [GPT_OSS_20B.md](GPT_OSS_20B.md). Everything below describes the Qwen path.)
+graphics card with 16 GB of RAM. (**gpt-oss-20b**, the default model, bypasses this adapter and the server's
+tokenizer - `serve/native.py` puts the same page in front of llama-server, see [GPT_OSS_20B.md](GPT_OSS_20B.md).
+Everything below describes the Qwen path.)
 
 ```
  browser / apps ──HTTP──▶ serve/server.py ──stdin/stdout──▶ engine_llamacpp/llamacpp_engine.py ──HTTP──▶ llama-server
@@ -31,6 +32,7 @@ Setup reads the tokenizer and the chat template from the GGUF itself (`tools/jed
 | `engine_llamacpp/tests/` | protocol tests against `fake_llama_server.py`, a stand-in that answers like llama-server |
 | `setup_lite.py` | the installer: checks the PC, picks a GGUF size, downloads llama.cpp and the model, writes the tokenizer and the config, starts the server |
 | `rebrand.py` | sets your product's name in the web app, Monitor, launchers, README and `brand.json` |
+| `serve/native.py` | JedAI's page in front of a model llama-server runs by itself (gpt-oss-20b); tests in `serve/test_native.py` |
 | `serve/server.py` | one change: an engine whose path ends in `.py` is started with Python |
 | `START-HERE.bat`, `setup.sh` | the launchers, and they run `setup_lite.py` (`rebrand.py` sets this) |
 
@@ -69,9 +71,9 @@ canned answer with the same events llama-server sends, so chat, streaming, cance
 
 ## Another model
 
-gpt-oss-20b is not in `MODELS`: its tokenizer is not the Qwen family the server was built for, so it runs on
-llama-server directly behind a proxy ([GPT_OSS_20B.md](GPT_OSS_20B.md)). Teaching `setup_lite.py` to install and start
-it is open work.
+gpt-oss-20b is in `MODELS` marked `"native"`: its tokenizer is not the Qwen family the server was built for, so
+llama-server runs it with its own chat template (`--jinja`) behind `serve/native.py` ([GPT_OSS_20B.md](GPT_OSS_20B.md)).
+Any other llama.cpp model that works with `--jinja` can be added the same way.
 
-For a Qwen-family model: add an entry to `MODELS` in `setup_lite.py` (its Hugging Face repos and default size). Any GGUF with the Qwen3.5-family
+For a Qwen-family model through `serve/server.py`: add an entry to `MODELS` in `setup_lite.py` (its Hugging Face repos and default size). Any GGUF with the Qwen3.5-family
 tokenizer works with the web app as it is; setup checks that and stops otherwise.

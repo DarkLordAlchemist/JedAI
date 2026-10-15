@@ -50,9 +50,9 @@ The experts are being computed on the CPU. Use layer placement: `--setup --mode 
 The llama.cpp build you have lacks `--moe-cache-mib`, so setup fell back to layer placement. Delete
 `data-lite\llama.cpp` and run setup again to get a newer build.
 
-**The Monitor says "Server not reachable" (gpt-oss-20b behind the proxy).**
+**The Monitor says "Server not reachable".**
 Reload the page. The Monitor stops polling after 3 failed requests and does not always recover when llama-server was
-restarted while the tab was open. See [GPT_OSS_20B.md](GPT_OSS_20B.md).
+restarted while the tab was open.
 
 **"the engine said nothing for 600 s".**
 The first prompt on a paging PC can take that long. Raise `"engine_silence_s"` in `jedai-<model>.json`,

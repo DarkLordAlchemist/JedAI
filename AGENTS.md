@@ -1,7 +1,7 @@
 # AGENTS.md
 
-JedAI runs large mixture-of-experts models on a normal PC (installer: Qwen3.6-35B-A3B; recommended: gpt-oss-20b,
-behind a proxy, see [docs/GPT_OSS_20B.md](docs/GPT_OSS_20B.md)): an 8 GB graphics
+JedAI runs large mixture-of-experts models on a normal PC (default: gpt-oss-20b, run by llama-server behind `serve/native.py`, see
+[docs/GPT_OSS_20B.md](docs/GPT_OSS_20B.md); also Qwen3.6-35B-A3B through `serve/server.py`): an 8 GB graphics
 card plus 16 GB of RAM, on Windows or Linux. It has a Python server with an OpenAI- and Anthropic-compatible API
 and a web app (`serve/`), an engine adapter that drives a private llama-server (`engine_llamacpp/`), and a
 one-click installer (`setup_lite.py`, started by `START-HERE.bat` / `setup.sh`).
@@ -14,7 +14,7 @@ one-click installer (`setup_lite.py`, started by `START-HERE.bat` / `setup.sh`).
   `READY`/`ERR` out). `engine_llamacpp/llamacpp_engine.py` speaks it - keep both sides in step.
 - Tests run without a GPU or downloads:
   `python -m pytest engine_llamacpp/tests -q` (the adapter, against a stand-in llama-server) and
-  `python -m pytest serve -q` (the server and web app).
+  `python -m pytest serve -q` (the server, `serve/native.py` and the web app).
 - The tokenizer tool has its own tests: `python -m unittest tools.test_jedai_tokenizer`.
 - Keep the docs' style: plain words, measured numbers with what they were measured on, no claims without a
   measurement.

@@ -1,7 +1,8 @@
 # gpt-oss-20b on an 8 GB laptop
 
-**gpt-oss-20b is the recommended model for an 8 GB graphics card with 16 GB of RAM.** This page has the measurements
-behind that, the exact command, and how the Chat / Monitor / About page is put in front of it.
+**gpt-oss-20b is JedAI's default model**, and the one recommended for an 8 GB graphics card with 16 GB of RAM.
+`START-HERE.bat` installs it. This page has the measurements behind that, the command it runs, and how the Chat /
+Monitor / About page is put in front of it.
 
 - Model: [gpt-oss-20b](https://huggingface.co/ggml-org/gpt-oss-20b-GGUF), file `gpt-oss-20b-MXFP4.gguf` (12.1 GB,
   24 layers, mixture of experts), Apache 2.0.
@@ -41,34 +42,36 @@ It started and answered on the 8 GB card; the speed above was measured at the be
 
 JedAI's own server (`serve/server.py`) only knows the Qwen tokenizer family, so it is **not** used for gpt-oss.
 llama.cpp's `llama-server` already does the chat template (`--jinja`), tool calls and the Anthropic `/v1/messages` API
-for this model. JedAI's page is put in front of it by a small reverse proxy, `jedai_shim.py` (Python standard library
-only; first written for Nemotron, no code change needed for gpt-oss):
+for this model. `serve/native.py` (Python standard library only; `START-HERE.bat` starts it) runs llama-server on a
+private port, locked with a key only it knows, and puts JedAI's page in front:
 
 ```
- Claude Code / apps ──▶ jedai_shim.py :8085 ──▶ llama-server :8086 ──▶ RTX GPU + RAM
- (ANTHROPIC_BASE_URL     serves Chat/Monitor/About,   gpt-oss-20b-MXFP4.gguf
-  = http://127.0.0.1:8085) answers /health, /v1/status,  -c 131072 --n-cpu-moe 18 --jinja
-                          /metrics from llama-server's
-                          own /metrics + hardware stats;
-                          forwards everything else as is
+ browser / Claude Code / apps ──▶ serve/native.py :8080 ──▶ llama-server (private port) ──▶ GPU + RAM
+ (ANTHROPIC_BASE_URL              serves Chat, Monitor, About;    gpt-oss-20b-MXFP4.gguf
+  = http://127.0.0.1:8080)        answers /health, /metrics,      -c 131072 --n-cpu-moe N --jinja
+                                  /v1/status from the requests
+                                  that pass and the GPU/CPU/RAM
+                                  readings; forwards the rest
 ```
 
-What works through the proxy: chat, the request log in the Monitor, and GPU / VRAM / temperature / power.
-What does not, and cannot without engine work:
+Use it like the other model: OpenAI base URL `http://127.0.0.1:8080/v1`, Claude Code `ANTHROPIC_BASE_URL=http://127.0.0.1:8080`.
+What the Monitor shows: the live state and speed, GPU load / VRAM / temperature / power / PCIe, CPU, RAM, disk, the
+context meter and the request table (tokens read and written, speed, time).
+What it cannot show:
 
-- The About tab's **Model settings** card is missing (it needs JedAI's run-config `/config`, which the proxy answers
-  with 404 on purpose; the page hides the card).
-- The Monitor's **cache hit-rate** column shows "–" (llama.cpp prints hit counts only at shutdown).
-- This is an unofficial side door: `setup_lite.py` does not install gpt-oss or start the proxy yet.
+- The About tab's **Model settings** card is missing (it needs JedAI's run-config `/config`; this model has none).
+- The **cache hit-rate** column and the conversation-cache card are empty (llama.cpp prints hit counts only at shutdown).
+- **Prefill progress** while a prompt is read is not shown; the state reads "Reading prompt" without a percentage.
+- No pictures yet (the page's attach button takes text files only).
+
+### Where the experts go
+
+`setup_lite.py` puts the experts of as many layers as fit the GPU on it (`--n-cpu-moe 24 - N`) and leaves the rest in
+RAM: on the 8 GB laptop 4-6 layers, on a 32 GB card all 24. It never uses `--moe-cache-mib` for this model.
 
 ### Claude Code
 
-Point it at the proxy and give it a short tool list, because gpt-oss's chat template can choke on big connector
-schemas:
-
-```
-set ANTHROPIC_BASE_URL=http://127.0.0.1:8085
-```
+Give it a short tool list: gpt-oss's chat template can choke on big connector schemas.
 
 ## If the Monitor says "Server not reachable"
 
