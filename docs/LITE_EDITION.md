@@ -2,7 +2,8 @@
 
 JedAI gives you everything a user sees (a chat page, the Monitor, the OpenAI and Anthropic APIs, the MCP tools,
 the one-click launchers) and runs it on llama.cpp: **Qwen3.6-35B-A3B** through a small engine adapter, on an 8 GB
-graphics card with 16 GB of RAM.
+graphics card with 16 GB of RAM. (**gpt-oss-20b**, the recommended model, bypasses this adapter and the server's
+tokenizer - see [GPT_OSS_20B.md](GPT_OSS_20B.md). Everything below describes the Qwen path.)
 
 ```
  browser / apps ──HTTP──▶ serve/server.py ──stdin/stdout──▶ engine_llamacpp/llamacpp_engine.py ──HTTP──▶ llama-server
@@ -44,7 +45,7 @@ Only what this edition uses ships: no C++ engine sources, no CUDA build, no upst
 | All experts in RAM, the rest from the SSD | llama.cpp memory-maps the GGUF: what does not fit in RAM is read from the disk by the OS |
 | MTP "guess, then check" | `--spec-type draft-mtp --spec-draft-n-max 2`, when the GGUF carries the MTP layer (setup prefers ggml-org's MTP repo) |
 | Conversation cache | `cache_prompt`: a follow-up reuses the prompt llama-server already holds (the Monitor's "Reused" column) |
-| Placement by layer (`--n-cpu-moe`) | `--mode layers` in setup, to compare against the cache on your PC |
+| Placement by layer (`--n-cpu-moe`) | `--mode layers` in setup. **Measured faster than the cache on an 8 GB laptop** (gpt-oss-20b 22.7 against 10.7 tok/s; Qwen3.6 about 40 against 8.3), so on 8 GB of VRAM use `--mode layers` |
 
 ## Running it without a GPU (for working on the web app)
 
@@ -68,5 +69,9 @@ canned answer with the same events llama-server sends, so chat, streaming, cance
 
 ## Another model
 
-Add an entry to `MODELS` in `setup_lite.py` (its Hugging Face repos and default size). Any GGUF with the Qwen3.5-family
+gpt-oss-20b is not in `MODELS`: its tokenizer is not the Qwen family the server was built for, so it runs on
+llama-server directly behind a proxy ([GPT_OSS_20B.md](GPT_OSS_20B.md)). Teaching `setup_lite.py` to install and start
+it is open work.
+
+For a Qwen-family model: add an entry to `MODELS` in `setup_lite.py` (its Hugging Face repos and default size). Any GGUF with the Qwen3.5-family
 tokenizer works with the web app as it is; setup checks that and stops otherwise.

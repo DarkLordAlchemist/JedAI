@@ -1,6 +1,7 @@
 # AGENTS.md
 
-JedAI runs Qwen3.6-35B-A3B, a 35-billion-parameter mixture-of-experts model, on a normal PC: an 8 GB graphics
+JedAI runs large mixture-of-experts models on a normal PC (installer: Qwen3.6-35B-A3B; recommended: gpt-oss-20b,
+behind a proxy, see [docs/GPT_OSS_20B.md](docs/GPT_OSS_20B.md)): an 8 GB graphics
 card plus 16 GB of RAM, on Windows or Linux. It has a Python server with an OpenAI- and Anthropic-compatible API
 and a web app (`serve/`), an engine adapter that drives a private llama-server (`engine_llamacpp/`), and a
 one-click installer (`setup_lite.py`, started by `START-HERE.bat` / `setup.sh`).

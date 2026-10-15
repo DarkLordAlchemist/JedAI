@@ -1,7 +1,7 @@
 # Something went wrong?
 
 The common problems and what to do. Everything the model printed while starting is in
-`jedai-qwen3.6-35b-a3b.log` in the JedAI folder - start there, and attach it when you ask for help.
+`jedai-<model>.log` (for example `jedai-qwen3.6-35b-a3b.log`) in the JedAI folder - start there, and attach it when you ask for help.
 
 ## While installing or starting
 
@@ -43,18 +43,22 @@ The experts are being paged from the SSD: RAM is full. Close other programs, or 
 (`--setup --quant IQ4_XS`). An NVMe SSD helps more than anything else.
 
 **Slow, but the GPU sits idle.**
-The experts are being computed on the CPU. Compare the two placements - `--setup --mode layers` against
-`--setup --mode cache` - and keep the faster one.
+The experts are being computed on the CPU. Use layer placement: `--setup --mode layers`. On an 8 GB card it measured
+2x faster than `--setup --mode cache`.
 
 **The Monitor shows no "experts cached" number.**
 The llama.cpp build you have lacks `--moe-cache-mib`, so setup fell back to layer placement. Delete
 `data-lite\llama.cpp` and run setup again to get a newer build.
 
+**The Monitor says "Server not reachable" (gpt-oss-20b behind the proxy).**
+Reload the page. The Monitor stops polling after 3 failed requests and does not always recover when llama-server was
+restarted while the tab was open. See [GPT_OSS_20B.md](GPT_OSS_20B.md).
+
 **"the engine said nothing for 600 s".**
-The first prompt on a paging PC can take that long. Raise `"engine_silence_s"` in `jedai-qwen3.6-35b-a3b.json`,
+The first prompt on a paging PC can take that long. Raise `"engine_silence_s"` in `jedai-<model>.json`,
 for example to `1200`.
 
 ## Still stuck?
 
 Open an [issue](https://github.com/DarkLordAlchemist/JedAI/issues) and attach
-`jedai-qwen3.6-35b-a3b.log` from the JedAI folder, with the console's last 30 lines.
+the `jedai-<model>.log` from the JedAI folder, with the console's last 30 lines.
