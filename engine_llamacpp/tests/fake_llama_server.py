@@ -112,10 +112,10 @@ class H(BaseHTTPRequestHandler):
             total = len(prompt)
             for done in range(cache, total + 1, max(1, (total - cache) // 3 or 1)):
                 ev({"prompt_progress": {"total": total, "cache": cache, "processed": done,
-                                        "time_ms": (time.time() - t0) * 1000}, "tokens": [], "content": "", "stop": False})
+                                        "time_ms": (time.time() - t0) * 1000}, "tokens": [0], "content": "", "stop": False})
                 time.sleep(0.05)
             ev({"prompt_progress": {"total": total, "cache": cache, "processed": total,
-                                    "time_ms": (time.time() - t0) * 1000}, "tokens": [], "content": "", "stop": False})
+                                    "time_ms": (time.time() - t0) * 1000}, "tokens": [0], "content": "", "stop": False})
             t1 = time.time()
             long = prompt[-1] == LONG_TRIGGER or (tok is not None and "count forever" in tok.decode(prompt[-40:]))
             out = LONG if long else REPLY

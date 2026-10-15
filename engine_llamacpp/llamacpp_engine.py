@@ -162,6 +162,20 @@ class LlamaServer:
                                      text=True, encoding="utf-8", errors="replace", bufsize=1, creationflags=flags)
         threading.Thread(target=self._copy_log, daemon=True).start()
 
+    def tokenize(self, text: str) -> list[int]:
+        """llama-server's own ids for `text` ([] if it cannot be asked)."""
+        try:
+            c = http.client.HTTPConnection("127.0.0.1", self.port, timeout=30)
+            c.request("POST", "/tokenize", body=json.dumps({"content": text, "add_special": False,
+                                                            "parse_special": False}),
+                      headers={"Content-Type": "application/json", "Authorization": f"Bearer {self.key}"})
+            r = c.getresponse()
+            data = json.loads(r.read() or b"{}")
+            c.close()
+            return [int(t) for t in data.get("tokens") or []] if r.status == 200 else []
+        except (OSError, http.client.HTTPException, ValueError):
+            return []
+
     def _copy_log(self):
         slots = 0
         for line in self.proc.stdout:
@@ -279,7 +293,7 @@ class Request:
                 pass
 
     def run(self):
-        produced, last_tok, final, resumed = 0, None, None, False
+        produced, last_tok, final, resumed, predicted = 0, None, None, False, 0
         t0 = time.monotonic()
         try:
             self.conn = http.client.HTTPConnection("127.0.0.1", self.srv.port, timeout=None)
@@ -312,7 +326,19 @@ class Request:
                     done, ms = int(prog.get("processed", 0)), float(prog.get("time_ms", 0.0))
                     rate = (done - cache) / (ms / 1000.0) if ms > 0 and done > cache else 0.0
                     self.emit(f"PP {done} {total} {ms:.0f} {rate:.1f}")
-                for tok in ev.get("tokens") or []:
+                # newer llama.cpp builds put a placeholder token 0 ("!") into every prompt-progress event; it is not
+                # a generated token, and used to show up as "!!!" at the start of every answer
+                toks = [] if prog else list(ev.get("tokens") or [])
+                # a character split across tokens (an emoji): llama-server holds the first token back and sends the
+                # whole text with only the LAST token's id in `tokens` (tokens_predicted jumps by more than the ids
+                # sent). Without the held token the answer shows U+FFFD, so take the ids for that text from llama-server.
+                n_pred = ev.get("tokens_predicted")
+                if not prog and isinstance(n_pred, int):
+                    gap = n_pred - predicted - len(toks)
+                    predicted = n_pred
+                    if gap > 0 and ev.get("content"):
+                        toks = self.srv.tokenize(ev["content"]) or toks
+                for tok in toks:
                     self.emit(f"T {int(tok)}")
                     produced += 1
                     last_tok = int(tok)
