@@ -25,6 +25,28 @@ other one). It is JedAI's own app (Chat, Monitor, About) either way.
 
 The test suites (web app, server, engine adapter) also pass without a GPU, against a stand-in llama-server.
 
+## What gpt-oss-20b is good at
+
+gpt-oss-20b is a 20-billion-parameter model running on a laptop, so use it for work it does well:
+
+- Answering factual questions and explaining concepts
+- Writing, editing, or brainstorming text in many styles (articles, stories, emails, reports, etc.)
+- Summarizing documents, articles, or long conversations
+- Assisting with programming, debugging, and explaining code snippets
+- Providing guidance on research, study strategies, and project planning
+- Offering creative ideas for projects, marketing, design, or content creation
+- Translating text between languages or helping with language learning
+- Helping with math, science, and logic problems, including step-by-step solutions
+
+What to expect instead:
+
+- **It has no internet or tools of its own.** The chat page sends your words to the model and nothing else, so it cannot
+  search the web, open links or read today's news; it answers from what it learned in training and says so when you
+  ask. Anything that needs the web has to come from a coding agent or app that brings its own tools and talks to
+  JedAI's API (below).
+- **It is a small model.** On facts it may be wrong or out of date, and on hard reasoning it is weaker than the large
+  cloud models. Check what matters.
+
 ## Install
 
 **Windows:** double-click `START-HERE.bat`. **Linux:** run `./setup.sh`.
