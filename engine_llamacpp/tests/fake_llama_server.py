@@ -38,7 +38,7 @@ if os.environ.get("FAKE_TOKENIZER"):
         tokens[i] = t
     tok = ST.Tokenizer(tokens, open(f"{tokdir}/merges.txt", encoding="utf-8").read().split("\n"),
                        json.load(open(f"{tokdir}/token_type.json")))
-REPLY = tok.encode("<think>\nThe user greets me.\n</think>\n\nHello from Qwen3.6 through llama.cpp!",
+REPLY = tok.encode("<think>\nThe user greets me.\n</think>\n\nHello through llama.cpp!",
                    parse_special=True) if tok else list(range(100, 124))
 LONG = tok.encode(" counting" * 400) if tok else [7] * 2000
 LONG_TRIGGER = 99999            # a prompt that ends with this id gets the long reply (cancel tests)

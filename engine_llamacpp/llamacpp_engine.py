@@ -3,8 +3,7 @@
 
 The web app, the OpenAI/Anthropic API and the Monitor (serve/) talk to an engine process over stdin/stdout with a
 small line protocol. This file speaks that protocol and does the model work through a private llama-server, so the
-whole front end runs unchanged on any model llama.cpp can load (here: Qwen3.6-35B-A3B, which shares the Qwen3.5
-tokenizer, so token ids pass through as they are).
+whole front end runs unchanged on any model llama.cpp can load (here: gpt-oss-20b).
 
     server -> engine                          engine -> server
     GEN <max_new> [k=v ...] <id,id,...>       INFO k=v ...         (once, before READY: the Monitor's facts)
@@ -48,7 +47,7 @@ import urllib.request
 
 ENGINE_NAME = "llama.cpp"
 BEAT_S = 10.0               # a BEAT line after this much silence during a request (serve/ ends silent engines)
-DEFAULT_EOS = [248046, 248044]       # <|im_end|>, <|endoftext|> in the Qwen3.5-family vocabulary
+DEFAULT_EOS = [248046, 248044]       # <|im_end|>, <|endoftext|> in the vocabulary
 
 
 _OUT = threading.Lock()

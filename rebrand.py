@@ -85,7 +85,7 @@ def main() -> int:
 
 README = """# {name}
 
-**Run Qwen3.6-35B-A3B, a 35-billion-parameter AI model, on a PC with an 8 GB graphics card and 16 GB of RAM.**{by}
+**Run gpt-oss-20b, a 20-billion-parameter AI model, on a PC with an 8 GB graphics card and 16 GB of RAM.**{by}
 {url}
 {name} is a local AI app: a chat page, a live Monitor of the model and your hardware, and OpenAI- and
 Anthropic-compatible APIs for your apps and coding agents. Nothing leaves your PC.
@@ -104,14 +104,13 @@ resume if interrupted), and opens the app at `http://127.0.0.1:8080`. Later runs
 | --- | --- |
 | Graphics card | NVIDIA with 8 GB or more (AMD and Intel through Vulkan: add `--vram-gb 8`) |
 | RAM | 16 GB or more |
-| Disk | about 25 GB free, on an SSD (NVMe recommended: with 16 GB of RAM part of the model is read from it) |
+| Disk | about 15 GB free, on an SSD |
 
 ## How does it fit?
 
-The model is a team of 256 small "experts" in each of its 40 layers, and each word needs only 8 of them. The part
-every word needs (attention, the router, the shared experts, the KV cache) stays on the graphics card. All experts stay
-in RAM, and the graphics card keeps the most recently used ones in a VRAM cache. A built-in draft layer guesses the
-next words and the model checks them in one pass, which makes answers faster.
+The model is a team of small "experts" in each of its 24 layers, and each word needs only a few. The part every word
+needs (attention, the router, the KV cache) stays on the graphics card. The experts of as many layers as fit in your
+VRAM go on the graphics card too; the rest stay in RAM.
 
 ## Use it from your apps
 
@@ -123,7 +122,7 @@ next words and the model checks them in one pass, which makes answers faster.
 - Built on [JedAI](https://github.com/DarkLordAlchemist/JedAI) (Apache 2.0), which itself builds on an
   MIT-licensed upstream project whose notice ships in `LICENSE.strata`.
 - Inference: [llama.cpp](https://github.com/ggml-org/llama.cpp) (MIT).
-- Model: [Qwen3.6-35B-A3B](https://huggingface.co/Qwen/Qwen3.6-35B-A3B) by the Qwen team (Apache 2.0).
+- Model: [gpt-oss-20b](https://huggingface.co/ggml-org/gpt-oss-20b-GGUF) by OpenAI (Apache 2.0).
 """
 
 if __name__ == "__main__":

@@ -1,7 +1,7 @@
 # Something went wrong?
 
 The common problems and what to do. Everything the model printed while starting is in
-`jedai-<model>.log` (for example `jedai-qwen3.6-35b-a3b.log`) in the JedAI folder - start there, and attach it when you ask for help.
+`jedai-<model>.log` (for example `jedai-gpt-oss-20b.log`) in the JedAI folder - start there, and attach it when you ask for help.
 
 ## While installing or starting
 

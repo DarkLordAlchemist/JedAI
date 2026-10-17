@@ -1030,7 +1030,7 @@ class ToolCallTagInProse(unittest.TestCase):
 
 class ToolCallRecovery(unittest.TestCase):
     """Opt-in ("tool_call_recovery": true): the model sometimes writes a call in a form next to the template's.  These
-    shapes are from a corpus of 1,462 agent turns (Qwen3.8 under Claude Code, signalnine/q27): with the switch on, a
+    shapes are from a corpus of 1,462 agent turns (a model under Claude Code): with the switch on, a
     declared tool's call in one of them is the call; anything else stays content, verbatim."""
     SCHEMA = ToolCallTerminators.SCHEMA
     PARAMS = "<parameter=path>\na.md\n</parameter>\n<parameter=content>\nhi\n</parameter>\n</function>"
@@ -1328,7 +1328,7 @@ class ClientShapes(unittest.TestCase):
             self.assertIn(part, text)
 
     def test_no_user_turn_is_a_400(self):
-        # #365: the template's own refusal (Qwen's "No user query found in messages." when no turn is a user's query)
+        # #365: the template's own refusal ("No user query found in messages." when no turn is a user's query)
         # answers 400, not a dropped connection
         with tempfile.TemporaryDirectory() as d:
             tpl = Path(d) / "chat_template.jinja"
@@ -3779,8 +3779,8 @@ class ModelAliases(unittest.TestCase):
     def setUpClass(cls):
         tok = ByteTokenizer()
         cls.svc = Service(MockEngine(tok, "</think>\n\nok", max_context=CTX), tok,
-                          ChatTemplate(ROOT / "serve/chat_template.jinja"), model_name="qwen3.8-flash-next-iq3_xxs")
-        cls.svc.set_aliases(["qwen", "local-model", "qwen", " ", "qwen3.8-flash-next-iq3_xxs"])
+                          ChatTemplate(ROOT / "serve/chat_template.jinja"), model_name="jedai-test-model")
+        cls.svc.set_aliases(["alias", "local-model", "alias", " ", "jedai-test-model"])
         cls.httpd = serve(cls.svc, port=0)
         cls.base = f"http://127.0.0.1:{cls.httpd.server_address[1]}"
 
@@ -3800,7 +3800,7 @@ class ModelAliases(unittest.TestCase):
             return r.read().decode()
 
     def test_set_aliases(self):
-        self.assertEqual(self.svc.aliases, ["qwen", "local-model"])        # duplicates, blanks and the name itself
+        self.assertEqual(self.svc.aliases, ["alias", "local-model"])        # duplicates, blanks and the name itself
         tok = ByteTokenizer()
         svc = Service(MockEngine(tok, "x", max_context=CTX), tok, ChatTemplate(ROOT / "serve/chat_template.jinja"))
         svc.set_aliases("a, b")
@@ -3813,16 +3813,16 @@ class ModelAliases(unittest.TestCase):
 
     def test_models_lists_them(self):
         data = self.get("/v1/models")["data"]
-        self.assertEqual([m["id"] for m in data], ["qwen3.8-flash-next-iq3_xxs", "qwen", "local-model"])
-        self.assertEqual(data[0]["aliases"], ["qwen", "local-model"])
-        self.assertEqual(data[1]["alias_of"], "qwen3.8-flash-next-iq3_xxs")
-        self.assertEqual(self.get("/props?model=local-model")["model_alias"], "qwen3.8-flash-next-iq3_xxs")
+        self.assertEqual([m["id"] for m in data], ["jedai-test-model", "alias", "local-model"])
+        self.assertEqual(data[0]["aliases"], ["alias", "local-model"])
+        self.assertEqual(data[1]["alias_of"], "jedai-test-model")
+        self.assertEqual(self.get("/props?model=local-model")["model_alias"], "jedai-test-model")
 
     def test_requests_are_answered_under_the_alias(self):
         msgs = [{"role": "user", "content": "hi"}]
-        for asked, want in (("qwen", "qwen"), ("local-model", "local-model"),
-                            ("qwen3.8-flash-next-iq3_xxs", "qwen3.8-flash-next-iq3_xxs"),
-                            ("something-else", "qwen3.8-flash-next-iq3_xxs")):    # still served, as before
+        for asked, want in (("alias", "alias"), ("local-model", "local-model"),
+                            ("jedai-test-model", "jedai-test-model"),
+                            ("something-else", "jedai-test-model")):    # still served, as before
             with self.subTest(asked=asked):
                 out = json.loads(self.post("/v1/chat/completions", {"model": asked, "messages": msgs, "max_tokens": 8}))
                 self.assertEqual(out["model"], want)

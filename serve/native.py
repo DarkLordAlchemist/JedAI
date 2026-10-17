@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """serve/native.py - JedAI's own app (Chat, Monitor, About) in front of a model llama-server runs by itself.
 
-serve/server.py tokenizes and renders chats itself, so it only fits the Qwen tokenizer family. A model like
+serve/server.py tokenizes and renders chats itself, so it only fits one tokenizer family. A model like
 gpt-oss-20b is better left to llama-server: `--jinja` does its chat template, its tool calls and its Anthropic
 `/v1/messages`. This module starts llama-server on a private port (locked with a key only this process knows) and puts
 JedAI's page in front of it:

@@ -8,8 +8,6 @@ __pycache__/
 /data-lite/
 /jedai-*.json
 /jedai-*.log
-*-qwen3.6-35b-a3b.json
-*-qwen3.6-35b-a3b.log
 /.jedai-mcp/
 
 # the no-GPU test scratch (docs/LITE_EDITION.md, "Running it without a GPU")

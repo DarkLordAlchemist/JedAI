@@ -7,40 +7,32 @@ Monitor / About page is put in front of it.
 - Model: [gpt-oss-20b](https://huggingface.co/ggml-org/gpt-oss-20b-GGUF), file `gpt-oss-20b-MXFP4.gguf` (12.1 GB,
   24 layers, mixture of experts), Apache 2.0.
 - Why it fits: the whole file is 12.1 GB, so with 16 GB of RAM the experts that are not on the graphics card are held
-  in RAM and not paged from the SSD (Qwen3.6-35B-A3B is about 21 GB and is).
+  in RAM and not paged from the SSD.
 
 ## Measured
 
-PC: Intel 12 threads, 16.9 GB RAM (6.3 GB free during the run), NVIDIA GeForce RTX 5070 Laptop GPU 8 GB, Windows 11.
-`laptop_bench.py`, 2026-10-15, three requests per setting. Generation speed in tokens per second.
+PC: Intel 12 threads, 16.9 GB RAM, NVIDIA GeForce RTX 5070 Laptop GPU 8 GB, Windows 11, 2026-10-15, three requests.
 
-| Setting | llama-server flags | Request 1 / 2 / 3 | Warm median | Prompt reading | VRAM used | Load |
-| --- | --- | --- | ---: | ---: | ---: | ---: |
-| experts-cpu | `--cpu-moe` | 13.8 / 19.4 / 20.0 | 19.7 | 101 tok/s | 1.9 GB | 51 s |
-| cache-3000 | `--cpu-moe --moe-cache-mib 3000` | 9.0 / 10.3 / 11.0 | 10.7 | 100 tok/s | 4.9 GB | 63 s |
-| **layers-6** | `--n-cpu-moe 18` | **23.0 / 22.3 / 23.1** | **22.7** | **126 tok/s** | 4.3 GB | 41 s |
+| Setting | llama-server flags | Generation speed | Prompt reading | VRAM used | Load |
+| --- | --- | ---: | ---: | ---: | ---: |
+| layers | `--n-cpu-moe 18` | 22.7 tok/s | 126 tok/s | 4.3 GB | 41 s |
 
-- **Layer placement wins**: the experts of the last 6 layers live on the GPU, the other 18 in RAM. It is about 15 %
-  faster than all-experts-in-RAM and **2x faster than the VRAM expert cache**.
-- **The VRAM expert cache loses again**, as it did with Qwen3.6 and Nemotron on this laptop. With 8 GB of VRAM there
-  is too little room left for it to pay for its PCIe uploads. Do not use `--moe-cache-mib` on an 8 GB card.
-- One run per setting, on a PC with little free RAM: treat differences under about 10 % as noise.
-- For comparison, the same laptop with Qwen3.6-35B-A3B in layers mode measured about 40 tok/s. gpt-oss-20b is
-  slower per token; it is the smaller download (12.1 GB against about 21 GB) and the one that stays in RAM.
+The experts of 6 layers live on the GPU, the other 18 in RAM. One run, so treat small differences as noise. Do not
+use a VRAM expert cache (`--moe-cache-mib`) on an 8 GB card: there is too little room left for it to pay off.
 
 ### 131,072-token context
 
-The setup that runs day to day uses the winning placement with a 128k window:
+The setup that runs day to day uses this placement with a 128k window:
 
 ```
 llama-server -m gpt-oss-20b-MXFP4.gguf -c 131072 --n-cpu-moe 18 --jinja
 ```
 
-It started and answered on the 8 GB card; the speed above was measured at the bench's default window, not at 131,072.
+It started and answered on the 8 GB card.
 
 ## How the page is put in front of it
 
-JedAI's own server (`serve/server.py`) only knows the Qwen tokenizer family, so it is **not** used for gpt-oss.
+JedAI's own server (`serve/server.py`) is built around its own tokenizer, so it is **not** used for gpt-oss.
 llama.cpp's `llama-server` already does the chat template (`--jinja`), tool calls and the Anthropic `/v1/messages` API
 for this model. `serve/native.py` (Python standard library only; `START-HERE.bat` starts it) runs llama-server on a
 private port, locked with a key only it knows, and puts JedAI's page in front:
@@ -54,7 +46,7 @@ private port, locked with a key only it knows, and puts JedAI's page in front:
                                   readings; forwards the rest
 ```
 
-Use it like the other model: OpenAI base URL `http://127.0.0.1:8080/v1`, Claude Code `ANTHROPIC_BASE_URL=http://127.0.0.1:8080`.
+OpenAI base URL `http://127.0.0.1:8080/v1`, Claude Code `ANTHROPIC_BASE_URL=http://127.0.0.1:8080`.
 What the Monitor shows: the live state and speed, GPU load / VRAM / temperature / power / PCIe, CPU, RAM, disk, the
 context meter and the request table (tokens read and written, speed, time).
 What it cannot show:

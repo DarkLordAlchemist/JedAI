@@ -1,11 +1,10 @@
 #!/usr/bin/env python3
-"""setup_lite.py - install and start the small-PC edition: gpt-oss-20b (default) or Qwen3.6-35B-A3B through llama.cpp,
+"""setup_lite.py - install and start the small-PC edition: gpt-oss-20b through llama.cpp,
 behind the same web app, API and Monitor.
 
     START-HERE.bat / ./setup.sh             first run: everything; later runs: start
     ... --setup                              choose again (quant, context, placement)
     ... --gguf D:\\models\\gpt-oss-20b-mxfp4.gguf     use a GGUF you already have (no download)
-    ... --model qwen3.6-35b-a3b              the other model
     ... --llama-server C:\\llama\\llama-server.exe        use a llama.cpp you already have
     ... --quant IQ4_XS --ctx 16384 --mode cache|layers --moe-cache-mib 3000 --yes --no-start
 
@@ -47,11 +46,8 @@ try:
 except (OSError, ValueError):
     pass
 
-# The models this edition offers. Any model whose GGUF carries the Qwen3.5-family tokenizer (pre "qwen35") works with
-# the web app as it is; add one here. Repos are tried in order for the size you pick; an MTP repo first, because its
-# file carries the draft layer that makes answers ~1.2-1.3x faster (llama.cpp --spec-type draft-mtp).
-# A model marked "native" is not run through serve/server.py (which tokenizes in the Qwen family's way) but by
-# llama-server itself (`--jinja`: its own chat template and tool calls), with JedAI's page in front: serve/native.py.
+# The model this edition offers. A model marked "native" is run by llama-server itself (`--jinja`: its own chat
+# template and tool calls), with JedAI's page in front: serve/native.py. Repos are tried in order for the size you pick.
 MODELS = {
     "gpt-oss-20b": {
         "title": "gpt-oss-20b",
@@ -60,13 +56,6 @@ MODELS = {
         "license": "Apache-2.0 (OpenAI)",
         "native": True,
         "default_ctx": 131072,
-    },
-    "qwen3.6-35b-a3b": {
-        "title": "Qwen3.6-35B-A3B",
-        "repos": ["ggml-org/Qwen3.6-35B-A3B-MTP-GGUF", "unsloth/Qwen3.6-35B-A3B-GGUF",
-                  "bartowski/Qwen_Qwen3.6-35B-A3B-GGUF"],
-        "default_quant": "Q4_K_M",
-        "license": "Apache-2.0 (Qwen)",
     },
 }
 DEFAULT_MODEL = "gpt-oss-20b"
@@ -362,7 +351,7 @@ def gguf_facts(path: Path) -> dict:
     interval = a("full_attention_interval")
     n_attn = n_layer // int(interval) if interval else n_layer
     nextn = int(a("nextn_predict_layers", 0) or 0)
-    return {"arch": arch, "n_layer": n_layer, "n_attn": n_attn + nextn, "mtp": nextn > 0,
+    return {"arch": arch, "name": md.get("general.name"), "n_layer": n_layer, "n_attn": n_attn + nextn, "mtp": nextn > 0,
             "kv_heads": int(a("attention.head_count_kv", 2) or 2),
             "k_len": int(a("attention.key_length", 256) or 256), "v_len": int(a("attention.value_length", 256) or 256),
             "expert_bytes": expert, "gpu_bytes": gpu_side, "embd_bytes": embd,
@@ -490,8 +479,7 @@ def main() -> int:
     if model.get("native"):
         return setup_native(a, model, cfg_path, gguf, facts, gpu, data, ram_total, os_reserve)
     if facts["pre"] != "qwen35":
-        raise SystemExit(f"{gguf.name}: tokenizer '{facts['pre']}'. The web app speaks the Qwen3.5-family tokenizer "
-                         "(pre 'qwen35') only; pick a Qwen3.5 / Qwen3.6 model.")
+        raise SystemExit(f"{gguf.name}: tokenizer '{facts['pre']}' is not supported by the web app's own server.")
     if not facts["eos_ids"]:
         raise SystemExit(f"{gguf.name}: no <|im_end|> token in its vocabulary")
     say(f"\n{gguf.name}: {facts['n_layer']} layers, {facts['n_expert']} experts each; experts "
@@ -543,7 +531,7 @@ def main() -> int:
                  "--llama-args", " ".join(f'"{x}"' if " " in x else x for x in p["args"])],
         "cwd": ".",
         "tokenizer": rel(tok_dir),
-        "model_name": a.model,
+        "model_name": shown_name(a, facts),
         "log": f"{BRAND['slug']}-{a.model}.log",
         "host": a.host,
         "port": a.port,
@@ -556,6 +544,13 @@ def main() -> int:
     if a.no_start:
         return 0
     return start(cfg_path, a)
+
+
+def shown_name(a, facts: dict) -> str:
+    """The name the page and the APIs show: the model's own name from the GGUF when you brought your own file
+    (--gguf), else the install's name."""
+    own = re.sub(r"[^A-Za-z0-9._-]+", "-", str(facts.get("name") or "")).strip("-")
+    return own.lower() if a.gguf and own else a.model
 
 
 def setup_native(a, model: dict, cfg_path: Path, gguf: Path, facts: dict, gpu: dict, data: Path,
@@ -585,7 +580,7 @@ def setup_native(a, model: dict, cfg_path: Path, gguf: Path, facts: dict, gpu: d
         "native": True,
         "llama_server": rel(exe),
         "model": rel(gguf),
-        "model_name": a.model,
+        "model_name": shown_name(a, facts),
         "quant": quant_of(gguf.name),
         "max_context": ctx,
         "gpu_expert_layers": on_gpu,

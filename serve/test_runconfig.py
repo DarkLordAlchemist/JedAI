@@ -21,7 +21,7 @@ from serve.server import ByteTokenizer, MockEngine, Service, serve
 
 ROOT = Path(__file__).resolve().parents[1]
 CFG = {"exe": "engine/jedai.exe", "args": ["--pack", "data/packs/q2_0", "--kv", "int8", "--spec-min-p", "0.5"],
-       "model_name": "qwen3.8-flash-next-q2_0", "port": 8080, "host": "0.0.0.0", "api_key": "",
+       "model_name": "jedai-test-model", "port": 8080, "host": "0.0.0.0", "api_key": "",
        "sampling": {"temperature": 0.7, "presence_penalty": 1.5},
        "mcp_servers": {"files": {"command": "npx", "args": ["-y", "server-filesystem", "."]}},
        "cors_origins": ["http://localhost:3000"]}
@@ -30,12 +30,12 @@ CFG = {"exe": "engine/jedai.exe", "args": ["--pack", "data/packs/q2_0", "--kv", 
 class Apply(unittest.TestCase):
     def test_only_the_named_keys_change(self):
         new, changed = runconfig.apply(CFG, {"sampling.top_p": 0.95, "reasoning_budget_tokens": 4096,
-                                             "vram_reserve_mib": 2048, "aliases": "qwen, local", "lazy_load": True})
+                                             "vram_reserve_mib": 2048, "aliases": "alias, local", "lazy_load": True})
         self.assertEqual(changed, ["sampling.top_p", "reasoning_budget_tokens", "vram_reserve_mib", "aliases",
                                    "lazy_load"])
         self.assertEqual(new["sampling"], {"temperature": 0.7, "presence_penalty": 1.5, "top_p": 0.95})
         self.assertEqual(new["args"][-2:], ["--vram-reserve-mib", "2048"])
-        self.assertEqual(new["aliases"], ["qwen", "local"])
+        self.assertEqual(new["aliases"], ["alias", "local"])
         for k in ("exe", "model_name", "port", "host", "api_key", "mcp_servers", "cors_origins"):
             self.assertEqual(new[k], CFG[k], k)
         self.assertEqual(CFG["sampling"], {"temperature": 0.7, "presence_penalty": 1.5})   # the input is left alone
