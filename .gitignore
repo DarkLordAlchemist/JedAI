@@ -1,0 +1,21 @@
+# Python
+__pycache__/
+.pytest_cache/
+*.pyc
+.venv/
+
+# created by setup_lite.py on the user's machine: downloads, the run config and its log
+/data-lite/
+/jedai-*.json
+/jedai-*.log
+/.jedai-mcp/
+
+# the no-GPU test scratch (docs/LITE_EDITION.md, "Running it without a GPU")
+/test-pack/
+/test-config.json
+*.log
+
+# IDEs
+.vscode/
+.idea/
+.cursor/

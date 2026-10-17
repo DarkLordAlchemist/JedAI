@@ -1,0 +1,3 @@
+# launchers keep their platform line endings wherever the repository is cloned
+*.sh text eol=lf
+*.bat text eol=crlf
